@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Ops Form</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; padding: 24px 16px; }
+  .app { max-width: 660px; margin: 0 auto; }
+  .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  .top-bar-left .date-small { font-size: 12px; color: #888; margin-bottom: 2px; }
+  .top-bar-left .week-title { font-size: 20px; font-weight: 600; color: #1a1a1a; }
+  .week-dots { display: flex; gap: 6px; }
+  .dot { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; border: 1.5px solid transparent; cursor: default; }
+  .day-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .day-tab { padding: 6px 16px; font-size: 13px; font-weight: 500; border: 1px solid #ddd; border-radius: 99px; cursor: pointer; background: #fff; color: #666; transition: all 0.15s; }
+  .day-tab:hover { border-color: #bbb; color: #333; }
+  .section-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 16px 20px; margin-bottom: 14px; }
+  .section-title { font-size: 11px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .subsection-header { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; margin-top: 4px; }
+  .summary-item { font-size: 14px; color: #1a1a1a; padding: 3px 0; font-weight: 500; line-height: 1.5; }
+  .summary-child { font-size: 13px; color: #666; padding: 2px 0 2px 14px; line-height: 1.5; }
+  .check-row { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; }
+  .check-row input[type=checkbox] { margin-top: 2px; flex-shrink: 0; width: 15px; height: 15px; cursor: pointer; accent-color: #444; }
+  .check-label { font-size: 13px; color: #1a1a1a; line-height: 1.4; cursor: pointer; }
+  .field-group { margin-bottom: 16px; }
+  .field-group:last-child { margin-bottom: 0; }
+  .field-label { font-size: 14px; font-weight: 500; color: #1a1a1a; margin-bottom: 6px; display: block; }
+  textarea { width: 100%; resize: vertical; font-size: 13px; padding: 8px 10px; border: 1px solid #e0e0e0; border-radius: 8px; background: #fafafa; color: #1a1a1a; font-family: inherit; min-height: 72px; outline: none; transition: border-color 0.15s; }
+  textarea:focus { border-color: #aaa; background: #fff; }
+  .divider { border: none; border-top: 1px solid #f0f0f0; margin: 14px 0; }
+  .actions { display: flex; gap: 12px; align-items: center; margin-top: 20px; }
+  .save-btn { padding: 9px 22px; font-size: 14px; font-weight: 500; background: #fff; border: 1px solid #ccc; border-radius: 8px; color: #1a1a1a; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+  .save-btn:hover { background: #f5f5f5; border-color: #bbb; }
+  .saved-msg { font-size: 13px; color: #2e7d32; display: none; }
+  .weekend-msg { font-size: 15px; color: #888; padding: 32px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <div class="date-small" id="date-label"></div>
+      <div class="week-title" id="week-label"></div>
+    </div>
+    <div class="week-dots" id="week-dots"></div>
+  </div>
+
+  <div class="day-tabs" id="day-tabs"></div>
+  <div id="day-content"></div>
+
+  <div class="actions" id="actions">
+    <button class="save-btn" onclick="saveDay()">Save day</button>
+    <span class="saved-msg" id="saved-msg">Saved!</span>
+  </div>
+
+</div>
+
+<script>
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+
+const DAY_COLORS = {
+  Monday:    { bg: '#EEEDFE', text: '#3C3489', dot: '#7F77DD' },
+  Tuesday:   { bg: '#E1F5EE', text: '#085041', dot: '#1D9E75' },
+  Wednesday: { bg: '#E6F1FB', text: '#0C447C', dot: '#378ADD' },
+  Thursday:  { bg: '#FAEEDA', text: '#633806', dot: '#EF9F27' },
+  Friday:    { bg: '#FAECE7', text: '#712B13', dot: '#D85A30' },
+};
+
+const SUMMARY_TASKS = [
+  { label: 'Weekly Planning' },
+  { label: 'Region Meeting' },
+  { label: 'Retention', children: ['Re-service Follow Ups','Red Flag tickets','BBB/AG/DOA','Applause Review Responses'] },
+  { label: 'Scheduling', children: ['Dedicated routes','Red Flag ride behinds'] },
+  { label: 'Billing', children: ['Collections/Payment processing','Updating credit cards/Auto pay','RAC Submissions'] },
+  { label: 'Reporting', children: ['Branch Metrics Support'] },
+];
+
+const RETENTION_CHECKBOXES = [
+  'Weekly ride behinds',
+  'Dedicated Route updates',
+  'On-time/unscheduled services scheduling',
+  'Address No Shows/Services not completed',
+  'Reschedule requests',
+  'Campaign responses/scheduling',
+];
+
+const BRANCH_FIELDS = [
+  { id: 'portland_north', label: 'Portland North check-in notes' },
+  { id: 'seattle_north',  label: 'Seattle North check-in notes' },
+  { id: 'seattle_south',  label: 'Seattle South check-in notes' },
+  { id: 'tacoma',         label: 'Tacoma check-in notes' },
+];
+
+function getMondayKey() {
+  const now = new Date(); const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const m = new Date(now); m.setDate(now.getDate() + diff);
+  return m.toISOString().split('T')[0];
+}
+function getTodayName() {
+  return {1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday'}[new Date().getDay()] || null;
+}
+function storeKey(day) { return 'ops_' + getMondayKey() + '_' + day; }
+function loadDay(day) { try { return JSON.parse(localStorage.getItem(storeKey(day)) || 'null'); } catch(e) { return null; } }
+function saveData(day, data) { try { localStorage.setItem(storeKey(day), JSON.stringify(data)); } catch(e) {} }
+
+let activeDay = getTodayName() || 'Monday';
+
+function renderTabs() {
+  const c = document.getElementById('day-tabs'); c.innerHTML = '';
+  DAYS.forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'day-tab'; btn.textContent = d;
+    const col = DAY_COLORS[d];
+    if (d === activeDay) {
+      btn.style.background = col.bg; btn.style.color = col.text;
+      btn.style.border = '1px solid ' + col.dot; btn.style.fontWeight = '600';
+    }
+    btn.onclick = () => { activeDay = d; renderTabs(); renderContent(); };
+    c.appendChild(btn);
+  });
+}
+
+function renderDots() {
+  const c = document.getElementById('week-dots'); c.innerHTML = '';
+  const today = getTodayName();
+  DAYS.forEach(d => {
+    const saved = loadDay(d); const col = DAY_COLORS[d];
+    const dot = document.createElement('div'); dot.className = 'dot'; dot.title = d;
+    if (d === today) {
+      dot.style.background = col.bg; dot.style.color = col.text; dot.style.borderColor = col.dot;
+    } else if (saved) {
+      dot.style.background = col.dot; dot.style.color = '#fff'; dot.style.borderColor = col.dot;
+    } else {
+      dot.style.background = '#f0f0f0'; dot.style.color = '#bbb'; dot.style.borderColor = '#e8e8e8';
+    }
+    dot.textContent = d[0]; c.appendChild(dot);
+  });
+}
+
+function renderContent() {
+  const saved = loadDay(activeDay) || {};
+  const c = document.getElementById('day-content'); c.innerHTML = '';
+  c.appendChild(buildSummary());
+  c.appendChild(buildBranchCheckin(saved));
+  c.appendChild(buildScheduling(saved));
+  document.getElementById('actions').style.display = 'flex';
+}
+
+function buildSummary() {
+  const card = document.createElement('div'); card.className = 'section-card';
+  const title = document.createElement('p'); title.className = 'section-title'; title.textContent = 'Summary';
+  card.appendChild(title);
+  SUMMARY_TASKS.forEach(t => {
+    const row = document.createElement('div'); row.className = 'summary-item'; row.textContent = t.label;
+    card.appendChild(row);
+    if (t.children) t.children.forEach(ch => {
+      const sub = document.createElement('div'); sub.className = 'summary-child';
+      sub.textContent = '– ' + ch; card.appendChild(sub);
+    });
+  });
+  return card;
+}
+
+function buildBranchCheckin(saved) {
+  const card = document.createElement('div'); card.className = 'section-card';
+  const title = document.createElement('p'); title.className = 'section-title';
+  title.textContent = 'Branch check-in — ' + activeDay; card.appendChild(title);
+  BRANCH_FIELDS.forEach(f => {
+    const grp = document.createElement('div'); grp.className = 'field-group';
+    const lbl = document.createElement('label'); lbl.className = 'field-label';
+    lbl.htmlFor = 'bc_' + f.id; lbl.textContent = f.label;
+    const ta = document.createElement('textarea'); ta.id = 'bc_' + f.id;
+    ta.placeholder = 'Notes...'; ta.value = saved['bc_' + f.id] || '';
+    ta.rows = 3; ta.oninput = () => autosave();
+    grp.appendChild(lbl); grp.appendChild(ta); card.appendChild(grp);
+  });
+  return card;
+}
+
+function buildScheduling(saved) {
+  const card = document.createElement('div'); card.className = 'section-card';
+
+  const sectionTitle = document.createElement('p'); sectionTitle.className = 'section-title';
+  sectionTitle.textContent = 'Scheduling — ' + activeDay; card.appendChild(sectionTitle);
+
+  const subHeader = document.createElement('p'); subHeader.className = 'subsection-header';
+  subHeader.textContent = activeDay + ' retention items'; card.appendChild(subHeader);
+
+  RETENTION_CHECKBOXES.forEach((item, i) => {
+    const row = document.createElement('div'); row.className = 'check-row';
+    const chk = document.createElement('input'); chk.type = 'checkbox';
+    chk.id = 'sched_chk_' + i; chk.checked = !!(saved['sched_chk_' + i]);
+    chk.onchange = () => autosave();
+    const lbl = document.createElement('label'); lbl.className = 'check-label';
+    lbl.htmlFor = 'sched_chk_' + i; lbl.textContent = item;
+    row.appendChild(chk); row.appendChild(lbl); card.appendChild(row);
+  });
+
+  const hr = document.createElement('hr'); hr.className = 'divider'; card.appendChild(hr);
+
+  const notesLbl = document.createElement('label'); notesLbl.className = 'field-label';
+  notesLbl.htmlFor = 'sched_notes'; notesLbl.textContent = 'Scheduling notes';
+  const ta = document.createElement('textarea'); ta.id = 'sched_notes';
+  ta.placeholder = 'Notes...'; ta.value = saved['sched_notes'] || '';
+  ta.rows = 3; ta.oninput = () => autosave();
+  card.appendChild(notesLbl); card.appendChild(ta);
+  return card;
+}
+
+function collectData() {
+  const data = {};
+  BRANCH_FIELDS.forEach(f => { const el = document.getElementById('bc_' + f.id); if (el) data['bc_' + f.id] = el.value; });
+  RETENTION_CHECKBOXES.forEach((_, i) => { const el = document.getElementById('sched_chk_' + i); if (el) data['sched_chk_' + i] = el.checked; });
+  const sn = document.getElementById('sched_notes'); if (sn) data['sched_notes'] = sn.value;
+  return data;
+}
+
+let autosaveTimer = null;
+function autosave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => { saveData(activeDay, collectData()); renderDots(); }, 500);
+}
+
+function saveDay() {
+  saveData(activeDay, collectData()); renderDots();
+  const msg = document.getElementById('saved-msg'); msg.style.display = 'inline';
+  setTimeout(() => { msg.style.display = 'none'; }, 2000);
+}
+
+function init() {
+  const now = new Date();
+  document.getElementById('date-label').textContent = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  document.getElementById('week-label').textContent = 'Week of ' + (() => {
+    const d = new Date(now); const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  })();
+  renderDots(); renderTabs(); renderContent();
+}
+init();
+</script>
+</body>
+</html>
